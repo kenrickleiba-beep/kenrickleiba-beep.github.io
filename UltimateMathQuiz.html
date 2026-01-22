@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultimate Maths Quiz by Kenrick Leiba and ChatGPT</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: lightgray;
+    color: black;
+    margin: 0;
+    padding: 20px;
+  }
+  .hidden { display: none; }
+  .center { text-align: center; }
+  .container { max-width: 900px; margin: 0 auto; }
+  .btn { padding: 10px 20px; margin: 10px; cursor: pointer; }
+  .review-green { color: green; }
+  .review-red { color: red; }
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div id="setup-screen">
+    <h1>Maths Quiz Setup</h1>
+    <div>
+      <label>Student Name:</label>
+      <input type="text" id="studentName">
+    </div>
+    <div>
+      <label>Quiz Length:</label>
+      <input type="number" id="quizLength" value="10" min="1" max="100">
+    </div>
+    <div>
+      <label>No repeat questions</label>
+      <input type="checkbox" id="noRepeat">
+    </div>
+    <div>
+      <label>Adaptive difficulty</label>
+      <input type="checkbox" id="adaptiveMode">
+    </div>
+
+    <h3>Maximum numbers</h3>
+    <div>
+      <label>Addition max:</label>
+      <input type="number" id="addMax" value="20" min="1" max="500">
+    </div>
+    <div>
+      <label>Subtraction max:</label>
+      <input type="number" id="subMax" value="20" min="1" max="500">
+    </div>
+    <div>
+      <label>Multiplication max:</label>
+      <input type="number" id="multMax" value="12" min="1" max="50">
+    </div>
+
+    <h3>Operations</h3>
+    <div>
+      <label>Addition</label>
+      <input type="checkbox" id="opAdd" checked>
+      <label>Subtraction</label>
+      <input type="checkbox" id="opSub">
+      <label>Multiplication</label>
+      <input type="checkbox" id="opMul">
+      <label>Division</label>
+      <input type="checkbox" id="opDiv">
+    </div>
+
+    <h3>Fixed modes</h3>
+    <div>
+      <label>Fixed addition</label>
+      <input type="checkbox" id="fixedAdd">
+      <input type="number" id="fixedAddValue" value="5" min="0" max="500">
+    </div>
+    <div>
+      <label>Fixed subtraction</label>
+      <input type="checkbox" id="fixedSub">
+      <input type="number" id="fixedSubValue" value="5" min="0" max="500">
+    </div>
+    <div>
+      <label>Fixed division</label>
+      <input type="checkbox" id="fixedDiv">
+      <input type="number" id="fixedDivValue" value="2" min="2" max="20">
+    </div>
+
+    <h3>Times tables</h3>
+    <div class="grid" id="tables"></div>
+
+    <h3>Appearance</h3>
+    <div>
+      <label>Background colour</label>
+      <select id="bgColour">
+        <option>light gray</option>
+        <option>white</option>
+        <option>red</option>
+        <option>blue</option>
+        <option>green</option>
+        <option>yellow</option>
+        <option>purple</option>
+        <option>black</option>
+        <option>pink</option>
+        <option>orange</option>
+      </select>
+    </div>
+    <div>
+      <label>Font colour</label>
+      <select id="fgColour">
+        <option>black</option>
+        <option>white</option>
+        <option>red</option>
+        <option>blue</option>
+        <option>green</option>
+        <option>yellow</option>
+        <option>purple</option>
+        <option>pink</option>
+        <option>orange</option>
+      </select>
+    </div>
+    <div>
+      <label>Font family</label>
+      <select id="fontFamily">
+        <option>Arial</option>
+        <option>Comic Sans MS</option>
+        <option>Times New Roman</option>
+        <option>Verdana</option>
+        <option>Courier New</option>
+      </select>
+    </div>
+    <div>
+      <label>Font size</label>
+      <input type="number" id="fontSize" value="20" min="14" max="40">
+    </div>
+
+    <button class="btn" onclick="startReadySetGo()">Start Quiz</button>
+  </div>
+
+  <div id="ready-screen" class="hidden center">
+    <h1 id="readyText">Ready</h1>
+  </div>
+
+  <div id="quiz-screen" class="hidden">
+    <h2 id="questionNumber"></h2>
+    <h3 id="questionText"></h3>
+    <input type="number" id="answerInput">
+  </div>
+
+  <div id="result-screen" class="hidden">
+    <h2 id="scoreText"></h2>
+    <h3 id="timeText"></h3>
+    <div id="reviewArea"></div>
+    <button class="btn" onclick="showSetup()">Play Again</button>
+    <button class="btn" onclick="downloadCSV()">Download CSV</button>
+  </div>
+</div>
+
+<script>
+const CONFIG_KEY = "quizConfig";
+
+let state = {
+  studentName: "",
+  fontSize: 20,
+  quizLength: 10,
+  noRepeat: false,
+  adaptiveMode: false,
+  bgColour: "light gray",
+  fgColour: "black",
+  fontFamily: "Arial",
+  addMax: 20,
+  subMax: 20,
+  multMax: 12,
+  fixedAdd: false,
+  fixedAddValue: 5,
+  fixedSub: false,
+  fixedSubValue: 5,
+  fixedDiv: false,
+  fixedDivValue: 2,
+  tables: Array(13).fill(false),
+  results: [],
+  usedQuestions: new Set(),
+  score: 0,
+  currentQ: 0,
+  startTime: 0,
+  questionStartTime: 0
+};
+
+function applyAppearance() {
+  document.body.style.backgroundColor = state.bgColour;
+  document.body.style.color = state.fgColour;
+  document.body.style.fontFamily = state.fontFamily;
+  document.body.style.fontSize = state.fontSize + "px";
+}
+
+function loadConfig() {
+  const config = localStorage.getItem(CONFIG_KEY);
+  if (!config) return;
+  Object.assign(state, JSON.parse(config));
+}
+
+function saveConfig() {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(state));
+}
+
+function initTables() {
+  const tableArea = document.getElementById("tables");
+  tableArea.innerHTML = "";
+  for (let i = 0; i <= 12; i++) {
+    const label = document.createElement("label");
+    label.textContent = i;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = state.tables[i];
+    checkbox.addEventListener("change", () => state.tables[i] = checkbox.checked);
+    label.prepend(checkbox);
+    tableArea.appendChild(label);
+  }
+}
+
+function showSetup() {
+  document.getElementById("setup-screen").classList.remove("hidden");
+  document.getElementById("ready-screen").classList.add("hidden");
+  document.getElementById("quiz-screen").classList.add("hidden");
+  document.getElementById("result-screen").classList.add("hidden");
+
+  document.getElementById("studentName").value = state.studentName;
+  document.getElementById("quizLength").value = state.quizLength;
+  document.getElementById("noRepeat").checked = state.noRepeat;
+  document.getElementById("adaptiveMode").checked = state.adaptiveMode;
+  document.getElementById("addMax").value = state.addMax;
+  document.getElementById("subMax").value = state.subMax;
+  document.getElementById("multMax").value = state.multMax;
+  document.getElementById("opAdd").checked = state.operations?.add ?? true;
+  document.getElementById("opSub").checked = state.operations?.sub ?? false;
+  document.getElementById("opMul").checked = state.operations?.mul ?? false;
+  document.getElementById("opDiv").checked = state.operations?.div ?? false;
+  document.getElementById("fixedAdd").checked = state.fixedAdd;
+  document.getElementById("fixedAddValue").value = state.fixedAddValue;
+  document.getElementById("fixedSub").checked = state.fixedSub;
+  document.getElementById("fixedSubValue").value = state.fixedSubValue;
+  document.getElementById("fixedDiv").checked = state.fixedDiv;
+  document.getElementById("fixedDivValue").value = state.fixedDivValue;
+  document.getElementById("bgColour").value = state.bgColour;
+  document.getElementById("fgColour").value = state.fgColour;
+  document.getElementById("fontFamily").value = state.fontFamily;
+  document.getElementById("fontSize").value = state.fontSize;
+
+  initTables();
+  applyAppearance();
+}
+
+function startReadySetGo() {
+  state.studentName = document.getElementById("studentName").value;
+  state.quizLength = parseInt(document.getElementById("quizLength").value);
+  state.noRepeat = document.getElementById("noRepeat").checked;
+  state.adaptiveMode = document.getElementById("adaptiveMode").checked;
+  state.addMax = parseInt(document.getElementById("addMax").value);
+  state.subMax = parseInt(document.getElementById("subMax").value);
+  state.multMax = parseInt(document.getElementById("multMax").value);
+  state.fixedAdd = document.getElementById("fixedAdd").checked;
+  state.fixedAddValue = parseInt(document.getElementById("fixedAddValue").value);
+  state.fixedSub = document.getElementById("fixedSub").checked;
+  state.fixedSubValue = parseInt(document.getElementById("fixedSubValue").value);
+  state.fixedDiv = document.getElementById("fixedDiv").checked;
+  state.fixedDivValue = parseInt(document.getElementById("fixedDivValue").value);
+  state.bgColour = document.getElementById("bgColour").value;
+  state.fgColour = document.getElementById("fgColour").value;
+  state.fontFamily = document.getElementById("fontFamily").value;
+  state.fontSize = parseInt(document.getElementById("fontSize").value);
+
+  if (!state.studentName.trim()) {
+    alert("Please enter student name.");
+    return;
+  }
+
+  applyAppearance();
+  saveConfig();
+  readySetGo();
+}
+
+function readySetGo() {
+  document.getElementById("setup-screen").classList.add("hidden");
+  document.getElementById("ready-screen").classList.remove("hidden");
+  document.getElementById("readyText").textContent = "Ready";
+
+  setTimeout(() => document.getElementById("readyText").textContent = "Set", 1000);
+  setTimeout(() => document.getElementById("readyText").textContent = "Go!", 2000);
+  setTimeout(() => startQuiz(), 2200);
+}
+
+function startQuiz() {
+  state.startTime = Date.now();
+  state.currentQ = 0;
+  state.score = 0;
+  state.results = [];
+  state.usedQuestions = new Set();
+  showQuestion();
+}
+
+function getSelectedOps() {
+  return [
+    { name: "Addition", enabled: document.getElementById("opAdd").checked },
+    { name: "Subtraction", enabled: document.getElementById("opSub").checked },
+    { name: "Multiplication", enabled: document.getElementById("opMul").checked },
+    { name: "Division", enabled: document.getElementById("opDiv").checked }
+  ].filter(op => op.enabled);
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateQuestion() {
+  const ops = getSelectedOps();
+  const op = ops[Math.floor(Math.random() * ops.length)].name;
+
+  if (op === "Addition") {
+    const a = state.fixedAdd ? state.fixedAddValue : randomInt(0, state.addMax);
+    const b = randomInt(0, state.addMax);
+    return { op, q: `${a} + ${b}`, ans: a + b };
+  }
+  if (op === "Subtraction") {
+    const b = state.fixedSub ? state.fixedSubValue : randomInt(0, state.subMax);
+    const a = randomInt(b, state.subMax);
+    return { op, q: `${a} - ${b}`, ans: a - b };
+  }
+  if (op === "Multiplication") {
+    const tables = state.tables.map((v, i) => v ? i : null).filter(v => v !== null);
+    const t = tables.length ? tables[Math.floor(Math.random() * tables.length)] : randomInt(0, state.multMax);
+    const m = randomInt(0, state.multMax);
+    return { op, q: `${t} × ${m}`, ans: t * m };
+  }
+  if (op === "Division") {
+    const d = state.fixedDiv ? state.fixedDivValue : randomInt(2, state.multMax);
+    const a = randomInt(0, state.multMax);
+    return { op, q: `${d * a} ÷ ${d}`, ans: a };
+  }
+}
+
+function showQuestion() {
+  if (state.currentQ >= state.quizLength) {
+    showResults();
+    return;
+  }
+
+  document.getElementById("ready-screen").classList.add("hidden");
+  document.getElementById("quiz-screen").classList.remove("hidden");
+
+  let attempts = 0;
+  while (true) {
+    const q = generateQuestion();
+    if (!state.noRepeat || !state.usedQuestions.has(q.q)) {
+      state.currentQuestion = q;
+      break;
+    }
+    attempts++;
+    if (attempts > 1000) {
+      alert("No more unique questions possible.");
+      showResults();
+      return;
+    }
+  }
+
+  state.usedQuestions.add(state.currentQuestion.q);
+  document.getElementById("questionNumber").textContent = `Question ${state.currentQ + 1}`;
+  document.getElementById("questionText").textContent = state.currentQuestion.q;
+  const input = document.getElementById("answerInput");
+  input.value = "";
+  input.focus();
+  state.questionStartTime = Date.now();
+
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") checkAnswer();
+  };
+}
+
+function checkAnswer() {
+  const input = document.getElementById("answerInput");
+  const user = parseInt(input.value);
+  if (isNaN(user)) return;
+
+  const correct = user === state.currentQuestion.ans;
+  const elapsed = (Date.now() - state.questionStartTime) / 1000;
+
+  if (state.adaptiveMode) {
+    if (correct && elapsed < 5) {
+      state.addMax = Math.min(state.addMax + 2, 500);
+      state.subMax = Math.min(state.subMax + 2, 500);
+      state.multMax = Math.min(state.multMax + 1, 50);
+    } else {
+      state.addMax = Math.max(state.addMax - 1, 5);
+      state.subMax = Math.max(state.subMax - 1, 5);
+      state.multMax = Math.max(state.multMax - 1, 5);
+    }
+  }
+
+  if (correct) state.score++;
+
+  state.results.push({
+    q: state.currentQuestion.q,
+    user,
+    ans: state.currentQuestion.ans,
+    correct
+  });
+
+  state.currentQ++;
+  showQuestion();
+}
+
+function showResults() {
+  const elapsed = (Date.now() - state.startTime) / 1000;
+  document.getElementById("quiz-screen").classList.add("hidden");
+  document.getElementById("result-screen").classList.remove("hidden");
+
+  document.getElementById("scoreText").textContent = `Score: ${state.score}/${state.quizLength}`;
+  document.getElementById("timeText").textContent = `Time: ${elapsed.toFixed(1)}s`;
+
+  const reviewArea = document.getElementById("reviewArea");
+  reviewArea.innerHTML = "";
+  state.results.forEach(r => {
+    const div = document.createElement("div");
+    div.textContent = `${r.q} = ${r.ans} (you: ${r.user})`;
+    div.className = r.correct ? "review-green" : "review-red";
+    div.style.fontSize = "14px";
+    reviewArea.appendChild(div);
+  });
+
+  saveResultsCSV(elapsed);
+}
+
+function saveResultsCSV(elapsed) {
+  const operations = getSelectedOps().map(o => o.name).join("|");
+  const mode = state.adaptiveMode ? "Adaptive" : "Fixed";
+
+  const rows = [
+    ["Name","Date","Time","Time Elapsed (s)","Score","Quiz Length","Operations","Mode"],
+    [state.studentName, new Date().toISOString().split("T")[0], new Date().toTimeString().split(" ")[0],
+     elapsed.toFixed(1), state.score, state.quizLength, operations, mode]
+  ];
+
+  state.csvContent = rows.map(r => r.join(",")).join("\n");
+}
+
+function downloadCSV() {
+  const blob = new Blob([state.csvContent], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "student_results.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+window.onload = () => {
+  loadConfig();
+  showSetup();
+};
+</script>
+</body>
+</html>
