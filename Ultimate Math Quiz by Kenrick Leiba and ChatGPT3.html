@@ -325,7 +325,7 @@ function showResults(){
     const d = document.createElement("div");
     d.textContent = `${r.q} = ${r.a} (you: ${r.u})`;
     d.className = r.ok ? "review-correct" : "review-wrong";
-    d.style.fontSize = "14px";
+    d.style.fontSize = "28px";
     app.appendChild(d);
   });
 
@@ -376,4 +376,5 @@ setupScreen();
 </script>
 </body>
 </html>
+
 
