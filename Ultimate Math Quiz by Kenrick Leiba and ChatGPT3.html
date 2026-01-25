@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ultimate Maths Quiz</title>
+<style>
+  body { margin: 0; }
+  #app { padding: 20px; max-width: 800px; margin: auto; }
+
+  label { display: block; margin: 6px 0; }
+  input, select, button { font-size: 18px; margin: 5px 0; }
+  button { padding: 8px 16px; cursor: pointer; }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .column { flex: 1; min-width: 220px; }
+
+  .review-correct { color: green; }
+  .review-wrong { color: red; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const app = document.getElementById("app");
+
+const state = {
+  name: "",
+  quizLength: 10,
+  fontSize: 20,
+  bg: "lightgray",
+  fg: "black",
+  font: "Arial",
+  noRepeat: false,
+  adaptive: false,
+
+  addMax: 20,
+  subMax: 20,
+  multMax: 12,
+
+  fixedAdd: false,
+  fixedAddVal: 5,
+  fixedSub: false,
+  fixedSubVal: 5,
+  fixedDiv: false,
+  fixedDivVal: 2,
+
+  ops: { add:true, sub:false, mul:false, div:false },
+  tables: Array(13).fill(false),
+
+  used: new Set(),
+  results: [],
+  current: 0,
+  score: 0,
+  startTime: 0
+};
+
+function clear(){
+  app.innerHTML = "";
+  document.body.style.background = state.bg;
+  document.body.style.color = state.fg;
+  document.body.style.fontFamily = state.font;
+}
+
+function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+function setupScreen(){
+  clear();
+  app.innerHTML = `
+    <h2>Maths Quiz Setup</h2>
+
+    <label>Name<br><input id="name" value="${state.name}"></label>
+
+    <label>Quiz length<br><input type="number" id="len" value="${state.quizLength}"></label>
+
+    <label><input type="checkbox" id="nr" ${state.noRepeat ? "checked":""}> No repeat questions</label>
+    <label><input type="checkbox" id="ad" ${state.adaptive ? "checked":""}> Adaptive difficulty</label>
+
+    <h3>Appearance</h3>
+    <label>Background color
+      <select id="bg">
+        <option ${state.bg==="lightgray"?"selected":""}>lightgray</option>
+        <option ${state.bg==="white"?"selected":""}>white</option>
+        <option ${state.bg==="red"?"selected":""}>red</option>
+        <option ${state.bg==="blue"?"selected":""}>blue</option>
+        <option ${state.bg==="green"?"selected":""}>green</option>
+        <option ${state.bg==="yellow"?"selected":""}>yellow</option>
+        <option ${state.bg==="purple"?"selected":""}>purple</option>
+        <option ${state.bg==="black"?"selected":""}>black</option>
+        <option ${state.bg==="pink"?"selected":""}>pink</option>
+        <option ${state.bg==="orange"?"selected":""}>orange</option>
+      </select>
+    </label>
+
+    <label>Font color
+      <select id="fg">
+        <option ${state.fg==="black"?"selected":""}>black</option>
+        <option ${state.fg==="white"?"selected":""}>white</option>
+        <option ${state.fg==="red"?"selected":""}>red</option>
+        <option ${state.fg==="blue"?"selected":""}>blue</option>
+        <option ${state.fg==="green"?"selected":""}>green</option>
+        <option ${state.fg==="yellow"?"selected":""}>yellow</option>
+        <option ${state.fg==="purple"?"selected":""}>purple</option>
+        <option ${state.fg==="pink"?"selected":""}>pink</option>
+        <option ${state.fg==="orange"?"selected":""}>orange</option>
+      </select>
+    </label>
+
+    <label>Font family
+      <select id="font">
+        <option ${state.font==="Arial"?"selected":""}>Arial</option>
+        <option ${state.font==="Comic Sans MS"?"selected":""}>Comic Sans MS</option>
+        <option ${state.font==="Times New Roman"?"selected":""}>Times New Roman</option>
+        <option ${state.font==="Verdana"?"selected":""}>Verdana</option>
+        <option ${state.font==="Courier New"?"selected":""}>Courier New</option>
+      </select>
+    </label>
+
+    <label>Font size<br><input type="number" id="fontSize" value="${state.fontSize}"></label>
+
+    <h3>Operations</h3>
+    <label><input type="checkbox" id="opAdd" ${state.ops.add?"checked":""}> Addition</label>
+    <label><input type="checkbox" id="opSub" ${state.ops.sub?"checked":""}> Subtraction</label>
+    <label><input type="checkbox" id="opMul" ${state.ops.mul?"checked":""}> Multiplication</label>
+    <label><input type="checkbox" id="opDiv" ${state.ops.div?"checked":""}> Division</label>
+
+    <h3>Max Values</h3>
+    <label>Addition max<br><input type="number" id="addMax" value="${state.addMax}"></label>
+    <label>Subtraction max<br><input type="number" id="subMax" value="${state.subMax}"></label>
+    <label>Multiplication max<br><input type="number" id="multMax" value="${state.multMax}"></label>
+
+    <h3>Fixed Modes</h3>
+    <label><input type="checkbox" id="fixedAdd" ${state.fixedAdd?"checked":""}> Fixed addition</label>
+    <label>Value<br><input type="number" id="fixedAddVal" value="${state.fixedAddVal}"></label>
+
+    <label><input type="checkbox" id="fixedSub" ${state.fixedSub?"checked":""}> Fixed subtraction</label>
+    <label>Value<br><input type="number" id="fixedSubVal" value="${state.fixedSubVal}"></label>
+
+    <label><input type="checkbox" id="fixedDiv" ${state.fixedDiv?"checked":""}> Fixed division</label>
+    <label>Value<br><input type="number" id="fixedDivVal" value="${state.fixedDivVal}"></label>
+
+    <h3>Times Tables (0-12)</h3>
+    <div class="row" id="tables"></div>
+
+    <button id="start">Start Quiz</button>
+  `;
+
+  const tablesDiv = document.getElementById("tables");
+  tablesDiv.innerHTML = "";
+  for(let i=0;i<=12;i++){
+    tablesDiv.innerHTML += `
+      <label><input type="checkbox" id="t${i}" ${state.tables[i]?"checked":""}> ${i}</label>
+    `;
+  }
+
+  document.getElementById("start").onclick = () => {
+    state.name = document.getElementById("name").value.trim();
+    if (!state.name) return alert("Enter name");
+
+    state.quizLength = Number(document.getElementById("len").value);
+    state.noRepeat = document.getElementById("nr").checked;
+    state.adaptive = document.getElementById("ad").checked;
+
+    state.bg = document.getElementById("bg").value;
+    state.fg = document.getElementById("fg").value;
+    state.font = document.getElementById("font").value;
+    state.fontSize = Number(document.getElementById("fontSize").value);
+
+    state.ops.add = document.getElementById("opAdd").checked;
+    state.ops.sub = document.getElementById("opSub").checked;
+    state.ops.mul = document.getElementById("opMul").checked;
+    state.ops.div = document.getElementById("opDiv").checked;
+
+    state.addMax = Number(document.getElementById("addMax").value);
+    state.subMax = Number(document.getElementById("subMax").value);
+    state.multMax = Number(document.getElementById("multMax").value);
+
+    state.fixedAdd = document.getElementById("fixedAdd").checked;
+    state.fixedAddVal = Number(document.getElementById("fixedAddVal").value);
+
+    state.fixedSub = document.getElementById("fixedSub").checked;
+    state.fixedSubVal = Number(document.getElementById("fixedSubVal").value);
+
+    state.fixedDiv = document.getElementById("fixedDiv").checked;
+    state.fixedDivVal = Number(document.getElementById("fixedDivVal").value);
+
+    for(let i=0;i<=12;i++){
+      state.tables[i] = document.getElementById(`t${i}`).checked;
+    }
+
+    if(!state.ops.add && !state.ops.sub && !state.ops.mul && !state.ops.div){
+      return alert("Select at least one operation");
+    }
+
+    readySetGo();
+  };
+}
+
+function readySetGo(){
+  clear();
+  app.innerHTML = `<h1 style="font-size:${state.fontSize}px">Ready</h1>`;
+  setTimeout(()=>app.innerHTML=`<h1 style="font-size:${state.fontSize}px">Set</h1>`,1000);
+  setTimeout(()=>app.innerHTML=`<h1 style="font-size:${state.fontSize}px">Go!</h1>`,2000);
+  setTimeout(startQuiz,2200);
+}
+
+function startQuiz(){
+  state.used.clear();
+  state.results = [];
+  state.current = 0;
+  state.score = 0;
+  state.startTime = performance.now();
+  showQuestion();
+}
+
+function genQuestion(){
+  const ops = [];
+  if(state.ops.add) ops.push("add");
+  if(state.ops.sub) ops.push("sub");
+  if(state.ops.mul) ops.push("mul");
+  if(state.ops.div) ops.push("div");
+
+  const op = ops[rand(0,ops.length-1)];
+  let q,a;
+
+  if(op==="add"){
+    let x = state.fixedAdd ? state.fixedAddVal : rand(0,state.addMax);
+    let y = rand(0,state.addMax);
+    q = `${x} + ${y}`; a = x+y;
+  }
+  if(op==="sub"){
+    let y = state.fixedSub ? state.fixedSubVal : rand(0,state.subMax);
+    let x = rand(y,state.subMax);
+    q = `${x} - ${y}`; a = x-y;
+  }
+  if(op==="mul"){
+    let tables = [];
+    for(let i=0;i<=12;i++) if(state.tables[i]) tables.push(i);
+    let t = tables.length ? tables[rand(0,tables.length-1)] : rand(0,state.multMax);
+    let m = rand(0,state.multMax);
+    q = `${t} × ${m}`; a = t*m;
+  }
+  if(op==="div"){
+    let d = state.fixedDiv ? state.fixedDivVal : rand(2,state.multMax);
+    let n = rand(0,state.multMax);
+    q = `${d*n} ÷ ${d}`; a = n;
+  }
+
+  return [q,a];
+}
+
+function showQuestion(){
+  if(state.current>=state.quizLength){
+    return showResults();
+  }
+
+  let q,a,tries=0;
+  do{
+    [q,a]=genQuestion();
+    tries++;
+    if(tries>1000) return showResults();
+  }while(state.noRepeat && state.used.has(q));
+
+  state.used.add(q);
+
+  clear();
+  app.innerHTML = `
+    <h3>Question ${state.current+1}</h3>
+    <div style="font-size:${state.fontSize}px">${q}</div>
+    <input id="ans" style="font-size:${state.fontSize}px">
+  `;
+
+  const ans = document.getElementById("ans");
+  requestAnimationFrame(()=>ans.focus());
+
+  ans.addEventListener("keydown", e => {
+    if(e.key==="Enter" && ans.value !== ""){
+      const u = Number(ans.value);
+      const ok = u===a;
+      const elapsed = (performance.now()-state.startTime)/1000;
+
+      if(state.adaptive){
+        if(ok && elapsed < 5){
+          state.addMax = Math.min(state.addMax+2, 500);
+          state.subMax = Math.min(state.subMax+2, 500);
+          state.multMax = Math.min(state.multMax+1, 50);
+        } else {
+          state.addMax = Math.max(state.addMax-1, 5);
+          state.subMax = Math.max(state.subMax-1, 5);
+          state.multMax = Math.max(state.multMax-1, 5);
+        }
+      }
+
+      if(ok) state.score++;
+
+      state.results.push({q,u,a,ok});
+      state.current++;
+      showQuestion();
+    }
+  });
+}
+
+function showResults(){
+  const elapsed = (performance.now()-state.startTime)/1000;
+  const acc = state.score/state.quizLength;
+
+  let msg = elapsed<=10 ? "Amazing speed! " :
+            elapsed<=20 ? "Great speed! " :
+            elapsed<=30 ? "Good speed! " :
+            elapsed<=40 ? "Nice effort! " :
+            "Good work! ";
+
+  msg += acc===1 ? "Perfect score! ⭐" :
+         acc>=0.8 ? "Great accuracy!" :
+         acc>=0.6 ? "Keep practising!" : "Keep practising!";
+
+  clear();
+  app.innerHTML = `
+    <h2>Score ${state.score}/${state.quizLength}</h2>
+    <h3>Time ${elapsed.toFixed(1)}s</h3>
+    <p>${msg}</p>
+  `;
+
+  state.results.forEach(r => {
+    const d = document.createElement("div");
+    d.textContent = `${r.q} = ${r.a} (you: ${r.u})`;
+    d.className = r.ok ? "review-correct" : "review-wrong";
+    d.style.fontSize = "14px";
+    app.appendChild(d);
+  });
+
+  const playAgain = document.createElement("button");
+  playAgain.textContent = "Play Again";
+  playAgain.onclick = setupScreen;
+  app.appendChild(playAgain);
+
+  const download = document.createElement("button");
+  download.textContent = "Download CSV";
+  download.onclick = downloadCSV;
+  app.appendChild(download);
+}
+
+function downloadCSV(){
+  const headers = ["Name","Date","Time","Time Elapsed (s)","Score","Quiz Length","Operations","Mode"];
+  const ops = [];
+  if(state.ops.add) ops.push("Addition");
+  if(state.ops.sub) ops.push("Subtraction");
+  if(state.ops.mul) ops.push("Multiplication");
+  if(state.ops.div) ops.push("Division");
+  const mode = state.adaptive ? "Adaptive" : "Fixed";
+
+  const now = new Date();
+  const row = [
+    state.name,
+    now.toISOString().split("T")[0],
+    now.toTimeString().split(" ")[0],
+    ((performance.now()-state.startTime)/1000).toFixed(1),
+    state.score,
+    state.quizLength,
+    ops.join("|"),
+    mode
+  ];
+
+  const csv = [headers.join(","), row.join(",")].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "maths_quiz_results.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+setupScreen();
+</script>
+</body>
+</html>
