@@ -306,13 +306,13 @@ function showResults(){
 
   let msg = elapsed<=10 ? "Amazing speed! " :
             elapsed<=20 ? "Great speed! " :
-            elapsed<=30 ? "Good speed! " :
-            elapsed<=40 ? "Nice effort! " :
+            elapsed<=30 ? "Good speed!Practise to get faster. " :
+            elapsed<=40 ? "Nice effort! Practise to get faster." :
             "Good work! ";
 
   msg += acc===1 ? "Perfect score! ⭐" :
-         acc>=0.8 ? "Great accuracy!" :
-         acc>=0.6 ? "Keep practising!" : "Keep practising!";
+         acc>=0.8 ? "Great accuracy! Made some mistakes." :
+         acc>=0.6 ? "Work on your accuracy!";
 
   clear();
   app.innerHTML = `
@@ -376,3 +376,4 @@ setupScreen();
 </script>
 </body>
 </html>
+
